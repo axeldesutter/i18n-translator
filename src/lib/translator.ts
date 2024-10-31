@@ -1,6 +1,6 @@
+import { jsonrepair } from "jsonrepair";
 import fs from "node:fs";
 import OpenAI from "openai";
-import { jsonrepair } from "jsonrepair";
 
 // Initialize OpenAI API
 const client = new OpenAI({
@@ -79,26 +79,6 @@ export class Translator {
 
     await Promise.all(translations_promises.map((p) => p()));
 
-    // for (const translations_file of this.translations_files) {
-    //   /** Translate file content */
-    //   const translated_content = await this.translate_file_content({
-    //     ...args,
-    //     content: translations_file.input,
-    //   });
-
-    //   console.log(
-    //     `Successfully translated ${translations_file.path
-    //       .split("/")
-    //       .pop()} from ${args.from} to ${args.to}`
-    //   );
-
-    //   this.translations_files = this.translations_files.map((file) => {
-    //     if (file.path === translations_file.path)
-    //       file.output = translated_content;
-    //     return file;
-    //   });
-    // }
-
     /** Save translations to output directory */
     for (const translations_file of this.translations_files) {
       const file_name = translations_file.path.split("/").pop();
@@ -133,7 +113,7 @@ export class Translator {
           content: prompt,
         },
       ],
-      model: "chatgpt-4o-latest",
+      model: "gpt-4o-2024-08-06",
     });
 
     /** Parse response */
@@ -141,14 +121,21 @@ export class Translator {
 
     try {
       /** Keep only what seems like json, i.e. what's between the highest level {} */
-      const json = (response.choices[0].message.content ?? "{}").match(
-        /\{([^)]+)\}/
-      );
+      const extractJSON = (str: string) => {
+        const start = str.indexOf("{");
+        const end = str.lastIndexOf("}") + 1;
 
-      if (json) {
-        const repaired_json = jsonrepair(json[0]);
-        translated_content = JSON.parse(repaired_json);
-      }
+        if (start === -1 || end === -1) {
+          throw new Error("No JSON object found in the string.");
+        }
+
+        return str.slice(start, end);
+      };
+
+      const json = extractJSON(response.choices[0].message.content ?? "{}");
+
+      const repaired_json = jsonrepair(json);
+      translated_content = JSON.parse(repaired_json);
     } catch (e) {
       console.log(e);
     }
